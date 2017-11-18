@@ -57,8 +57,19 @@ int get_free_disk_size(char* p) {
 }
 
 // TODO: 
+// the number of files = the number of directory entries in root folder
+// Except for the files with attributes 0x0F and with attributes Volume Label or filename is invalid
 int get_num_root_files(char* p) {
-  return 0;
+  p += SECTOR_SIZE * 19;
+  int result = 0;
+  while (p[0] != 0x00) {
+    if ((p[11] & 0b00000010) == 0 && (p[11] & 0b00001000) == 0 && (p[11] & 0b00010000) == 0) {
+      result++;
+    }
+    p += 32;
+  }
+
+  return result;
 }
 
 int get_num_FAT_copy(char* p) {
