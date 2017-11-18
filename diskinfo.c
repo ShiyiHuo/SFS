@@ -5,6 +5,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#define SECTOR_SIZE 512   // bytes per sector 
+
 void get_os_name(char* os_name, char* p) {
   int i;
   for (i = 0; i < 8; i++) {
@@ -12,18 +14,49 @@ void get_os_name(char* os_name, char* p) {
   }
 }
 
+// TODO: INCOMPLETE
+// if not empty, read volume label from boot sector
+// else, read it from directory entry
 void get_disk_label(char* disk_label, char* p) {
-  return;
+  int i;
+  for (i = 0; i < 11; i++) {
+    disk_label[i] = p[i+43];
+  }
 }
+  
 
 int get_total_disk_size(char* p) {
-  return 0;
+  int total_sector_count = p[19] + (p[20] << 8);
+  return total_sector_count * SECTOR_SIZE;
 }
 
-int get_free_disk_size(int total_disk_size, char* p) {
-  return 0;
+// TODO: broken function. Differs from sample output.
+int get_free_disk_size(char* p) {
+  int num_free_sector = 0;
+  int total_sector_count = p[19] + (p[20] << 8);
+  int entry;
+
+  for (entry = 2; entry < total_sector_count-1-33+2; entry++) {   // potential bug
+    int a;
+    int b;
+    int result;
+    if ((entry % 2) == 0) {
+      a = p[SECTOR_SIZE + ((3 * entry) / 2) + 1] & 0x0F;  // low 4 bits
+      b = p[SECTOR_SIZE + ((3 * entry) / 2)];
+      result = (a << 8) + b;
+    } else {
+      a = p[SECTOR_SIZE + (int)((3 * entry) / 2)] & 0xF0;  // high 4 bits
+      b = p[SECTOR_SIZE + (int)((3 * entry) / 2) + 1];
+      result = (a >> 4) + (b << 4);
+    }
+    if (result == 0x000) {
+      num_free_sector++;
+    }
+  }
+  return num_free_sector * SECTOR_SIZE;
 }
 
+// TODO: 
 int get_num_root_files(char* p) {
   return 0;
 }
@@ -33,7 +66,7 @@ int get_num_FAT_copy(char* p) {
 }
 
 int get_sector_per_FAT(char* p) {
-  return 0;
+  return p[22] + (p[23] << 8);
 }
 
 
@@ -66,7 +99,7 @@ int main(int argc, char* argv[]) {
   char* disk_label = malloc(sizeof(char) * 11);
   get_disk_label(disk_label, p);
   int total_disk_size = get_total_disk_size(p);
-  int free_disk_size = get_free_disk_size(total_disk_size, p);
+  int free_disk_size = get_free_disk_size(p);
   int num_root_files = get_num_root_files(p);
   int num_FAT_copy = get_num_FAT_copy(p);
   int sector_per_FAT = get_sector_per_FAT(p);
