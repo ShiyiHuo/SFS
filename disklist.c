@@ -48,11 +48,10 @@ void display_directory_listing(char* p) {
     int hour = (time & 0xF800) >> 11;
     int minute = ((time & 0x07E0) >> 5);
 
-    // TODO: print date and time
     if ((p[11] & 0b00000010) == 0 && (p[11] & 0b00001000) == 0) {  // if file is not hidden
       printf("%c %10d %20s %d-%02d-%02d %02d:%02d\n", file_type, file_size, file_name, year, month, day, hour, minute);
     }
-    
+
     p += 32;
   }
 }
