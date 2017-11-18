@@ -72,14 +72,14 @@ int main(int argc, char* argv[]) {
   int sector_per_FAT = get_sector_per_FAT(p);
 
   printf("OS Name: %s\n", os_name);
-	printf("Label of the disk: %s\n", disk_label);
-	printf("Total size of the disk: %d bytes\n", total_disk_size);
-	printf("Free size of the disk: %d bytes\n\n", free_disk_size);
-	printf("==============\n");
-	printf("The number of files in the root directory (not including subdirectories): %d\n\n", num_root_files);
-	printf("=============\n");
-	printf("Number of FAT copies: %d\n", num_FAT_copy);
-  printf("Sectors per FAT: %d\n", sector_per_FAT);\
+  printf("Label of the disk: %s\n", disk_label);
+  printf("Total size of the disk: %d bytes\n", total_disk_size);
+  printf("Free size of the disk: %d bytes\n\n", free_disk_size);
+  printf("==============\n");
+  printf("The number of files in the root directory (not including subdirectories): %d\n\n", num_root_files);
+  printf("=============\n");
+  printf("Number of FAT copies: %d\n", num_FAT_copy);
+  printf("Sectors per FAT: %d\n", sector_per_FAT);
 
   munmap(p, file_stat.st_size);
   close(file);
