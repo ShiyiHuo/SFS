@@ -40,7 +40,6 @@ int get_total_disk_size(char* p) {
   return total_sector_count * SECTOR_SIZE;
 }
 
-// TODO: broken function. Differs from sample output.
 int get_free_disk_size(char* p) {
   int num_free_sector = 0;
   int total_sector_count = p[19] + (p[20] << 8);
@@ -66,14 +65,15 @@ int get_free_disk_size(char* p) {
   return num_free_sector * SECTOR_SIZE;
 }
 
-// TODO:
-// the number of files = the number of directory entries in root folder
-// Except for the files with attributes 0x0F and with attributes Volume Label or filename is invalid
+// TODO: need final check!
+// the number of root files = the number of directory entries in root folder...
+// except for those whose attribute = 0x0f (long filename) or 0x08 (volume label),
+// and those whose filename is 0xE5
 int get_num_root_files(char* p) {
   p += SECTOR_SIZE * 19;
   int result = 0;
   while (p[0] != 0x00) {
-    if ((p[11] & 0b00000010) == 0 && (p[11] & 0b00001000) == 0 && (p[11] & 0b00010000) == 0) {
+    if ((p[0] != 0xE5) && (p[11] != 0x0F) && (p[11] != 0x08)) {
       result++;
     }
     p += 32;
@@ -89,7 +89,6 @@ int get_num_FAT_copy(char* p) {
 int get_sector_per_FAT(char* p) {
   return p[22] + (p[23] << 8);
 }
-
 
 
 int main(int argc, char* argv[]) {
