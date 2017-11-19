@@ -60,7 +60,7 @@ void display_directory_listing(char* p) {
 
 int main(int argc, char* argv[]) {
   if (argc != 2) {
-    printf("Usage: 'diskinfo <disk image>'\n");
+    printf("Usage: 'disklist <disk image>'\n");
     exit(1);
   }
 
