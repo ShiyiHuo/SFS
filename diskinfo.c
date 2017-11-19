@@ -5,7 +5,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#define SECTOR_SIZE 512   // bytes per sector 
+#define SECTOR_SIZE 512   // bytes per sector
 
 void get_os_name(char* os_name, char* p) {
   int i;
@@ -14,16 +14,26 @@ void get_os_name(char* os_name, char* p) {
   }
 }
 
-// TODO: INCOMPLETE
-// if not empty, read volume label from boot sector
-// else, read it from directory entry
+// read volume label from boot sector
+// if empty, read it from directory entry
+// if volume label bit = 1, the corresponding filename is the volume label for the disk
 void get_disk_label(char* disk_label, char* p) {
   int i;
   for (i = 0; i < 11; i++) {
     disk_label[i] = p[i+43];
   }
+  if (disk_label[0] == ' ') {
+    p += SECTOR_SIZE * 19;
+    while (p[0] != 0x00) {
+      if (p[11] == 8) {  // if bit3 (volume label) = 1
+        for (i = 0; i < 8; i++) {
+          disk_label[i] = p[i];
+        }
+      }
+      p += 32;
+    }
+  }
 }
-  
 
 int get_total_disk_size(char* p) {
   int total_sector_count = p[19] + (p[20] << 8);
@@ -36,7 +46,7 @@ int get_free_disk_size(char* p) {
   int total_sector_count = p[19] + (p[20] << 8);
   int entry;
 
-  for (entry = 2; entry < total_sector_count-1-33+2; entry++) {   // potential bug
+  for (entry = 2; entry <= total_sector_count-1-33+2; entry++) {   // potential bug
     int a;
     int b;
     int result;
@@ -56,7 +66,7 @@ int get_free_disk_size(char* p) {
   return num_free_sector * SECTOR_SIZE;
 }
 
-// TODO: 
+// TODO:
 // the number of files = the number of directory entries in root folder
 // Except for the files with attributes 0x0F and with attributes Volume Label or filename is invalid
 int get_num_root_files(char* p) {
