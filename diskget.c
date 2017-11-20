@@ -116,7 +116,7 @@ int get_first_logical_sector(char* file_name, char* p) {
   return -1;
 }
 
-int get_fat_entry(int entry, char* p) {
+int get_FAT_entry(int entry, char* p) {
   int a;
   int b;
   int result;
@@ -150,7 +150,7 @@ void copy_file(char* p, char* p2, char* file_name) {
       p2[file_size - remaining_byte] = p[i + physical_entry];
       remaining_byte--;
     }
-    fat_entry = get_fat_entry(fat_entry,p);
+    fat_entry = get_FAT_entry(fat_entry,p);
   } while (fat_entry != 0xFFF);
 }
 

@@ -6,7 +6,7 @@
 #include <unistd.h>
 #include <time.h>
 
-
+#define SECTOR_SIZE 512
 
 int get_free_disk_size(char* p) {
   int num_free_sector = 0;
@@ -33,14 +33,94 @@ int get_free_disk_size(char* p) {
   return num_free_sector * SECTOR_SIZE;
 }
 
+int get_FAT_entry(int entry, char* p) {
+  int a;
+  int b;
+  int result;
+  if ((entry % 2) == 0) {
+    a = p[SECTOR_SIZE + ((3 * entry) / 2) + 1] & 0x0F;  // low 4 bits
+    b = p[SECTOR_SIZE + ((3 * entry) / 2)];
+    result = (a << 8) + b;
+  } else {
+    a = p[SECTOR_SIZE + (int)((3 * entry) / 2)] & 0xF0;  // high 4 bits
+    b = p[SECTOR_SIZE + (int)((3 * entry) / 2) + 1];
+    result = (a >> 4) + (b << 4);
+  }
+  return result;
+}
+
+int get_next_unused_FAT_entry(char* p) {
+  p += SECTOR_SIZE;
+
+  int entry = 2;
+  while (get_FAT_entry(entry,p) != 0x000) {
+    entry++;
+  }
+  return entry;
+}
+
+void create_root_directory(char* file_name, int file_size, int first_logical_sector, char* p) {
+  p += SECTOR_SIZE * 19;
+  // find a free root directory
+  while (p[0] != 0x00) {
+    p += 32;
+  }
+
+  // TODO: 
+  // set filename and extension
+
+  // TODO: what should it be?
+  // set attribute
+  p[11] = 0x00;
+
+  // TODO: SET DATE AND TIME
+  // set create date & time
+  time_t rawtime;
+  struct tm* timeinfo;
+  time(&rawtime);
+  timeinfo = localtime(&rawtime);
+
+  int year = (timeinfo->tm_year + 1900);
+  int month = (timeinfo->tm_mon + 1);
+  int day = timeinfo->tm_mday;
+  int hour = timeinfo->tm_hour;
+  int minute = timeinfo->tm_min;
+
+
+
+  // TODO: PROBLEM...
+  // set first logical cluster
+  p[26] = first_logical_sector - (p[27] << 8);
+  p[27] = (first_logical_sector - p[26]) >> 8;
+
+  // set file size
+  p[28] = (file_size & 0x000000FF);
+  p[29] = (file_size & 0x0000FF00) >> 8;
+  p[30] = (file_size & 0x00FF0000) >> 16;
+  p[31] = (file_size & 0xFF000000) >> 24;
+
+}
+
+
+void update_FAT_entry(int entry, int value, char* p) {
+  p += SECTOR_SIZE;
+
+  if ((entry % 2) == 0) {
+    p[SECTOR_SIZE + ((3 * entry) / 2) + 1] = (value >> 8) & 0x0F;
+    p[SECTOR_SIZE + ((3 * entry) / 2)] = value & 0xFF;
+  } else {
+    p[SECTOR_SIZE + (int)((3 * entry) / 2)] = (value << 4) & 0xF0;
+    p[SECTOR_SIZE + (int)((3 * entry) / 2) + 1] = (value >> 4) & 0xFF;
+  }
+}
+
 /*
 (1) Create a new directory entry in root folder
-(2) Check if the disk has enough space to store the file
-(3) Go through the FAT entries to find unused sectors in disk
-and copy the file content to these sectors.
-(4) Update the first cluster number field of directory entry we just created, update the FAT entries we used.
+(2) Update the first cluster number field of directory entry we just created, update the FAT entries we used.
+(3) Go through the FAT entries to find unused sectors in disk and copy the file content to these sectors.
 */
 void copy_file_to_disk(char* p, char* p2, char* file_name, int file_size) {
+  // create new root directory entry
 
 }
 
