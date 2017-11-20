@@ -6,7 +6,45 @@
 #include <unistd.h>
 #include <time.h>
 
+#define SECTOR_SIZE 512
 
+// returns 1 if file exists and returns -1 if file doesn't exist
+int file_exists(char* file_name, char* p) {
+  while (p[0] != 0x00) {
+      if ((p[11] & 0x02) == 0 && (p[11] & 0x08) == 0) {
+        char* curr_file_name = malloc(sizeof(char)*8);
+        char* curr_file_extension = malloc(sizeof(char)*3);
+        //char* curr_file = malloc(strlen(curr_file_name) + strlen(curr_file_extension) + 1);
+        // char* curr_file = concat_name_extension(curr_file_name, curr_file_extension, p);
+
+        int i;
+        for (i = 0; i < 8; i++) {
+          if (p[i] == ' ') {
+            break;
+          }
+          curr_file_name[i] = p[i];
+        }
+
+        for (i = 0; i < 3; i++) {
+          curr_file_extension[i] = p[i+8];
+        }
+
+        char* result = malloc(strlen(curr_file_name) + strlen(curr_file_extension) + 1);
+        strcpy(result, curr_file_name);
+        strcat(result, ".");
+        strcat(result, curr_file_extension);
+
+        //printf("curr file: %s\n", result);
+
+        if (strcmp(file_name, result) == 0) {
+          return 1;
+        }
+      }
+      p += 32;
+    }
+
+    return -1;
+}
 
 int get_free_disk_size(char* p) {
   int num_free_sector = 0;
@@ -33,14 +71,110 @@ int get_free_disk_size(char* p) {
   return num_free_sector * SECTOR_SIZE;
 }
 
+int get_FAT_entry(int entry, char* p) {
+  int a;
+  int b;
+  int result;
+  if ((entry % 2) == 0) {
+    a = p[SECTOR_SIZE + ((3 * entry) / 2) + 1] & 0x0F;  // low 4 bits
+    b = p[SECTOR_SIZE + ((3 * entry) / 2)];
+    result = (a << 8) + b;
+  } else {
+    a = p[SECTOR_SIZE + (int)((3 * entry) / 2)] & 0xF0;  // high 4 bits
+    b = p[SECTOR_SIZE + (int)((3 * entry) / 2) + 1];
+    result = (a >> 4) + (b << 4);
+  }
+  return result;
+}
+
+int get_next_unused_FAT_entry(char* p) {
+  p += SECTOR_SIZE;
+
+  int entry = 2;
+  while (get_FAT_entry(entry,p) != 0x000) {
+    entry++;
+  }
+  return entry;
+}
+
+void create_root_directory(char* file_name, int file_size, int first_logical_sector, char* p) {
+  p += SECTOR_SIZE * 19;
+  // find a free root directory
+  while (p[0] != 0x00) {
+    p += 32;
+  }
+
+  // set filename and extension
+  int i;
+  int stop = -1; // index of .
+  for (i = 0; i < 8; i++) {
+    if (file_name[i] == '.') {
+      stop = i;
+      break;
+    }
+    p[i] = file_name[i];
+  }
+  if (stop != -1) {
+    for (i = stop; i < 8; i++) {
+      p[i] = ' ';
+    }
+  }
+  for (i = 0; i < 3; i++) {
+    p[i+8] = file_name[i+stop+1];
+  }
+  
+  // TODO: what should it be?
+  // set attribute
+  p[11] = 0x00;
+
+  // TODO: SET DATE AND TIME
+  // set create date & time
+  time_t rawtime;
+  struct tm* timeinfo;
+  time(&rawtime);
+  timeinfo = localtime(&rawtime);
+
+  int year = (timeinfo->tm_year + 1900);
+  int month = (timeinfo->tm_mon + 1);
+  int day = timeinfo->tm_mday;
+  int hour = timeinfo->tm_hour;
+  int minute = timeinfo->tm_min;
+
+
+
+  // TODO: PROBLEM...
+  // set first logical cluster
+  p[26] = first_logical_sector - (p[27] << 8);
+  p[27] = (first_logical_sector - p[26]) >> 8;
+
+  // set file size
+  p[28] = (file_size & 0x000000FF);
+  p[29] = (file_size & 0x0000FF00) >> 8;
+  p[30] = (file_size & 0x00FF0000) >> 16;
+  p[31] = (file_size & 0xFF000000) >> 24;
+
+}
+
+
+void update_FAT_entry(int entry, int value, char* p) {
+  p += SECTOR_SIZE;
+
+  if ((entry % 2) == 0) {
+    p[SECTOR_SIZE + ((3 * entry) / 2) + 1] = (value >> 8) & 0x0F;
+    p[SECTOR_SIZE + ((3 * entry) / 2)] = value & 0xFF;
+  } else {
+    p[SECTOR_SIZE + (int)((3 * entry) / 2)] = (value << 4) & 0xF0;
+    p[SECTOR_SIZE + (int)((3 * entry) / 2) + 1] = (value >> 4) & 0xFF;
+  }
+}
+
 /*
 (1) Create a new directory entry in root folder
-(2) Check if the disk has enough space to store the file
-(3) Go through the FAT entries to find unused sectors in disk
-and copy the file content to these sectors.
-(4) Update the first cluster number field of directory entry we just created, update the FAT entries we used.
+(2) Update the first cluster number field of directory entry we just created, update the FAT entries we used.
+(3) Go through the FAT entries to find unused sectors in disk and copy the file content to these sectors.
 */
 void copy_file_to_disk(char* p, char* p2, char* file_name, int file_size) {
+  // create new root directory entry
 
 }
 
@@ -70,19 +204,27 @@ int main(int argc, char* argv[]) {
 
   // open file and map memory
   int file2 = open(argv[2], O_RDWR);
+  int file_name = argv[2];
   if (file2 == -1) {
     printf("File not found.\n");
+    close(file);
     exit(1);
   }
   struct stat file_stat2;
   if (fstat(file2, &file_stat2) < 0) {
+    close(file2);
     exit(1);
   }
   int file_size = file_stat2.st_size;
   char* p2 = mmap(NULL, file_stat2.st_size, PROT_READ, MAP_SHARED, file2, 0);  // ptr to map memory
   if (p2 == MAP_FAILED) {
     printf("Error: failed to map memory for file");
-    close(file);
+    exit(1);
+  }
+
+  // check if the file already exists in the disk
+  if (file_exists(file_name, p + SECTOR_SIZE * 19)) {
+    printf("File %s already exists.\n", file_name);
     exit(1);
   }
 
