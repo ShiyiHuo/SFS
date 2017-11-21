@@ -15,7 +15,7 @@ int file_exists(char* file_name, char* p) {
     if ((p[11] & 0x02) == 0 && (p[11] & 0x08) == 0) {
       char* curr_file_name = malloc(sizeof(char)*20);
       char* curr_file_extension = malloc(sizeof(char)*3);
-      
+
       int i;
       for (i = 0; i < 8; i++) {
         if (p[i] == ' ') {
@@ -116,10 +116,10 @@ void create_root_directory(char* file_name, int file_size, int first_logical_sec
   for (i = 0; i < 3; i++) {
     p[i+8] = file_name[i+stop+1];
   }
-  
+
   // TODO: what should it be?
   // set attribute
-  p[11] = 0x00;
+  p[11] = 0x20;
 
   // TODO: SET DATE AND TIME
   // set create date & time
@@ -133,24 +133,9 @@ void create_root_directory(char* file_name, int file_size, int first_logical_sec
   int day = timeinfo->tm_mday;
   int hour = timeinfo->tm_hour;
   int minute = timeinfo->tm_min;
-  // well.....
-  p[14] = 0;
-  p[15] = 0;
-  p[16] = 0;
-  p[17] = 0;
-  p[17] |= (year - 1980) << 1;
-  p[17] |= (month - ((p[16] & 0b11100000) >> 5)) >> 3;
-  p[16] |= (month - (((p[17] & 0b00000001)) << 3)) << 5;
-  p[16] |= (day & 0b00011111);
-  p[15] |= (hour << 3) & 0b11111000;
-  p[15] |= (minute - ((p[14] & 0b11100000) >> 5)) >> 3;
-  p[14] |= (minute - ((p[15] & 0b00000111) << 3)) << 5;
-
 
   // TODO: PROBLEM...
   // set first logical cluster
-  p[26] = (first_logical_sector - (p[27] << 8)) & 0xFF;
-  p[27] = (first_logical_sector - p[26]) >> 8;
 
   // set file size
   p[28] = (file_size & 0x000000FF);
