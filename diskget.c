@@ -42,9 +42,8 @@ int get_file_size(char* file_name, char* p) {
 
   while (p[0] != 0x00) {
     if ((p[11] & 0x02) == 0 && (p[11] & 0x08) == 0) { // not hidden, not volume label
-      char* curr_file_name = malloc(sizeof(char)*8);
+      char* curr_file_name = malloc(sizeof(char)*20);
       char* curr_file_extension = malloc(sizeof(char)*3);
-      //char* curr_file = concat_name_extension(curr_file_name, curr_file_extension, p);
 
       int i;
       for (i = 0; i < 8; i++) {
@@ -58,13 +57,11 @@ int get_file_size(char* file_name, char* p) {
         curr_file_extension[i] = p[i+8];
       }
 
-      char* result = malloc(strlen(curr_file_name) + strlen(curr_file_extension) + 1);
-      strcpy(result, curr_file_name);
-      strcat(result, ".");
-      strcat(result, curr_file_extension);
+      strcat(curr_file_name, ".");
+      strcat(curr_file_name, curr_file_extension);
 
-      printf("curr file: %s\n", result);
-      if (strcmp(file_name, result) == 0) {
+      printf("curr file: %s\n", curr_file_name);
+      if (strcmp(file_name, curr_file_name) == 0) {
         file_size = ((p[28] & 0xFF) + ((p[29] & 0xFF) << 8) + ((p[30] & 0xFF) << 16) + ((p[31] & 0xFF) << 24));
         printf("before return\n");
         printf("file_size: %d\n", file_size);
@@ -82,11 +79,9 @@ int get_file_size(char* file_name, char* p) {
 int get_first_logical_sector(char* file_name, char* p) {
   while (p[0] != 0x00) {
     if ((p[11] & 0x02) == 0 && (p[11] & 0x08) == 0) {
-      char* curr_file_name = malloc(sizeof(char)*8);
+      char* curr_file_name = malloc(sizeof(char)*20);
       char* curr_file_extension = malloc(sizeof(char)*3);
-      //char* curr_file = malloc(strlen(curr_file_name) + strlen(curr_file_extension) + 1);
-      // char* curr_file = concat_name_extension(curr_file_name, curr_file_extension, p);
-
+      
       int i;
       for (i = 0; i < 8; i++) {
         if (p[i] == ' ') {
@@ -99,14 +94,10 @@ int get_first_logical_sector(char* file_name, char* p) {
         curr_file_extension[i] = p[i+8];
       }
 
-      char* result = malloc(strlen(curr_file_name) + strlen(curr_file_extension) + 1);
-      strcpy(result, curr_file_name);
-      strcat(result, ".");
-      strcat(result, curr_file_extension);
+      strcat(curr_file_name, ".");
+      strcat(curr_file_name, curr_file_extension);
 
-      //printf("curr file: %s\n", result);
-
-      if (strcmp(file_name, result) == 0) {
+      if (strcmp(file_name, curr_file_name) == 0) {
         return (p[26] + (p[27] << 8));
       }
     }

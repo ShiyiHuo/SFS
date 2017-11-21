@@ -9,6 +9,37 @@
 
 #define SECTOR_SIZE 512
 
+int get_file_size(char* file_name, char* p) {
+  while (p[0] != 0x00) {
+    if ((p[11] & 0x02) == 0 && (p[11] & 0x08) == 0) {
+      char* curr_file_name = malloc(sizeof(char)*20);
+      char* curr_file_extension = malloc(sizeof(char)*3);
+      
+      int i;
+      for (i = 0; i < 8; i++) {
+        if (p[i] == ' ') {
+          break;
+        }
+        curr_file_name[i] = p[i];
+      }
+
+      for (i = 0; i < 3; i++) {
+        curr_file_extension[i] = p[i+8];
+      }
+
+      strcat(curr_file_name, ".");
+      strcat(curr_file_name, curr_file_extension);
+
+      if (strcmp(file_name, curr_file_name) == 0) {
+        return (p[28] & 0xFF) + ((p[29] & 0xFF) << 8) + ((p[30] & 0xFF) << 16) + ((p[31] & 0xFF) << 24);
+      }
+    }
+    p += 32;
+  }
+
+  return -1;
+}
+
 void display_directory_listing(char* p) {
   while (p[0] != 0x00) {
     char file_type;
@@ -18,7 +49,7 @@ void display_directory_listing(char* p) {
       file_type = 'F';
     }
 
-    char* file_name = malloc(sizeof(char) * 8);
+    char* file_name = malloc(sizeof(char) * 20);
     int i;
     for (i = 0; i < 8; i++) {
       if (p[i] == ' ') {
@@ -35,8 +66,9 @@ void display_directory_listing(char* p) {
     strcat(file_name, ".");
     strcat(file_name, file_extension);
 
-    int file_size = (p[28] & 0xFF) + ((p[29] & 0xFF) << 8) + ((p[30] & 0xFF) << 16) + ((p[31] & 0xFF) << 24);
-
+    //int file_size = (p[28] & 0xFF) + ((p[29] & 0xFF) << 8) + ((p[30] & 0xFF) << 16) + ((p[31] & 0xFF) << 24);
+    int file_size = get_file_size(file_name, p);
+    
     int date = *(unsigned short *)(p + 16);
     int time = *(unsigned short *)(p + 14);
 

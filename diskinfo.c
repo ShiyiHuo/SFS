@@ -73,7 +73,8 @@ int get_num_root_files(char* p) {
   p += SECTOR_SIZE * 19;
   int result = 0;
   while (p[0] != 0x00) {
-    if ((p[0] != 0xE5) && (p[11] != 0x0F) && (p[11] != 0x08)) {
+    // if ((p[0] != 0xE5) && (p[11] != 0x0F) && (p[11] != 0x08)) {
+    if ((p[11] != 0x0F) && (p[11] != 0x08)) {
       result++;
     }
     p += 32;

@@ -5,45 +5,43 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <time.h>
+#include <string.h>
 
 #define SECTOR_SIZE 512
 
 // returns 1 if file exists and returns -1 if file doesn't exist
 int file_exists(char* file_name, char* p) {
   while (p[0] != 0x00) {
-      if ((p[11] & 0x02) == 0 && (p[11] & 0x08) == 0) {
-        char* curr_file_name = malloc(sizeof(char)*8);
-        char* curr_file_extension = malloc(sizeof(char)*3);
-        //char* curr_file = malloc(strlen(curr_file_name) + strlen(curr_file_extension) + 1);
-        // char* curr_file = concat_name_extension(curr_file_name, curr_file_extension, p);
-
-        int i;
-        for (i = 0; i < 8; i++) {
-          if (p[i] == ' ') {
-            break;
-          }
-          curr_file_name[i] = p[i];
+    if ((p[11] & 0x02) == 0 && (p[11] & 0x08) == 0) {
+      char* curr_file_name = malloc(sizeof(char)*20);
+      char* curr_file_extension = malloc(sizeof(char)*3);
+      
+      int i;
+      for (i = 0; i < 8; i++) {
+        if (p[i] == ' ') {
+          break;
         }
-
-        for (i = 0; i < 3; i++) {
-          curr_file_extension[i] = p[i+8];
-        }
-
-        char* result = malloc(strlen(curr_file_name) + strlen(curr_file_extension) + 1);
-        strcpy(result, curr_file_name);
-        strcat(result, ".");
-        strcat(result, curr_file_extension);
-
-        //printf("curr file: %s\n", result);
-
-        if (strcmp(file_name, result) == 0) {
-          return 1;
-        }
+        curr_file_name[i] = p[i];
       }
-      p += 32;
-    }
 
-    return -1;
+      for (i = 0; i < 3; i++) {
+        curr_file_extension[i] = p[i+8];
+      }
+
+      strcat(curr_file_name, ".");
+      strcat(curr_file_name, curr_file_extension);
+
+      if (strcmp(file_name, curr_file_name) == 0) {
+        printf("file_name: %s\n", curr_file_name);
+        printf("file exist label\n");
+        return 1;
+      }
+    }
+    p += 32;
+  }
+
+  printf("file not exist label\n");
+  return -1;
 }
 
 int get_free_disk_size(char* p) {
@@ -139,12 +137,23 @@ void create_root_directory(char* file_name, int file_size, int first_logical_sec
   int day = timeinfo->tm_mday;
   int hour = timeinfo->tm_hour;
   int minute = timeinfo->tm_min;
-
+  // well.....
+  p[14] = 0;
+  p[15] = 0;
+  p[16] = 0;
+  p[17] = 0;
+  p[17] |= (year - 1980) << 1;
+  p[17] |= (month - ((p[16] & 0b11100000) >> 5)) >> 3;
+  p[16] |= (month - (((p[17] & 0b00000001)) << 3)) << 5;
+  p[16] |= (day & 0b00011111);
+  p[15] |= (hour << 3) & 0b11111000;
+  p[15] |= (minute - ((p[14] & 0b11100000) >> 5)) >> 3;
+  p[14] |= (minute - ((p[15] & 0b00000111) << 3)) << 5;
 
 
   // TODO: PROBLEM...
   // set first logical cluster
-  p[26] = first_logical_sector - (p[27] << 8);
+  p[26] = (first_logical_sector - (p[27] << 8)) & 0xFF;
   p[27] = (first_logical_sector - p[26]) >> 8;
 
   // set file size
@@ -154,7 +163,6 @@ void create_root_directory(char* file_name, int file_size, int first_logical_sec
   p[31] = (file_size & 0xFF000000) >> 24;
 
 }
-
 
 void update_FAT_entry(int entry, int value, char* p) {
   p += SECTOR_SIZE;
@@ -174,8 +182,32 @@ void update_FAT_entry(int entry, int value, char* p) {
 (3) Go through the FAT entries to find unused sectors in disk and copy the file content to these sectors.
 */
 void copy_file_to_disk(char* p, char* p2, char* file_name, int file_size) {
-  // create new root directory entry
+  if (file_exists(file_name, p + SECTOR_SIZE * 19) == -1) {
+    int remaining_byte = file_size;
+    int curr_FAT_entry = get_next_unused_FAT_entry(p);
+    int physical_entry;
+    create_root_directory(file_name, file_size, curr_FAT_entry, p);
+    while (remaining_byte > 0) {
+      physical_entry = SECTOR_SIZE * (31 + curr_FAT_entry);
 
+      int i;
+      for (i = 0; i < SECTOR_SIZE; i++) {
+        if (remaining_byte == 0) {
+          update_FAT_entry(curr_FAT_entry, 0xFFF, p);
+          return;
+        }
+        p[i + physical_entry] = p2[file_size - remaining_byte];
+        remaining_byte--;
+      }
+      update_FAT_entry(curr_FAT_entry, 0x69, p);
+      int next_FAT_entry = get_next_unused_FAT_entry(p);
+      update_FAT_entry(curr_FAT_entry, next_FAT_entry, p);
+      curr_FAT_entry = next_FAT_entry;
+    }
+  } else {
+    printf("File already exists.\n");
+    exit(1);
+  }
 }
 
 
@@ -195,7 +227,7 @@ int main(int argc, char* argv[]) {
   if (fstat(file, &file_stat) < 0) {
     exit(1);
   }
-  char* p = mmap(NULL, file_stat.st_size, PROT_READ, MAP_SHARED, file, 0);  // ptr to map memory
+  char* p = mmap(NULL, file_stat.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, file, 0);  // ptr to map memory
   if (p == MAP_FAILED) {
     printf("Error: failed to map memory for disk image");
     close(file);
@@ -204,7 +236,6 @@ int main(int argc, char* argv[]) {
 
   // open file and map memory
   int file2 = open(argv[2], O_RDWR);
-  int file_name = argv[2];
   if (file2 == -1) {
     printf("File not found.\n");
     close(file);
@@ -219,12 +250,6 @@ int main(int argc, char* argv[]) {
   char* p2 = mmap(NULL, file_stat2.st_size, PROT_READ, MAP_SHARED, file2, 0);  // ptr to map memory
   if (p2 == MAP_FAILED) {
     printf("Error: failed to map memory for file");
-    exit(1);
-  }
-
-  // check if the file already exists in the disk
-  if (file_exists(file_name, p + SECTOR_SIZE * 19)) {
-    printf("File %s already exists.\n", file_name);
     exit(1);
   }
 
