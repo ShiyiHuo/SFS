@@ -9,36 +9,10 @@
 
 #define SECTOR_SIZE 512
 
-// Copies a file from the file system (root directory) to the current directory in Linux: ./diskget disk.IMA ANS1.PDF
-// 1.Convert the given filename to upper case, then search this filename from directory entries in root folder.
-// 2.If filename matching, get the first cluster number & file size.
-// 3.Rely on FAT entries to copy.
-// 4.If (Last cluster of file && reach the filesize value), stop copy.
-
-
-// char* concat_name_extension(char* file_name, char* file_extension, char* p) {
-//   int i;
-//   for (i = 0; i < 8; i++) {
-//     if (p[i] == ' ') {
-//       break;
-//     }
-//     file_name[i] = p[i];
-//   }
-//
-//   for (i = 0; i < 3; i++) {
-//     file_extension[i] = p[i+8];
-//   }
-//
-//   char* result = malloc(strlen(file_name) + strlen(file_extension) + 1);
-//   strcpy(result, file_name);
-//   strcat(result, ".");
-//   strcat(result, file_extension);
-//
-//   return result;
-// }
-
 // return file size if file exists, otherwise return -1
 int get_file_size(char* file_name, char* p) {
+  int file_size;
+
   while (p[0] != 0x00) {
     if ((p[11] & 0x02) == 0 && (p[11] & 0x08) == 0) { // not hidden, not volume label
       char* curr_file_name = malloc(sizeof(char)*20);
@@ -60,8 +34,7 @@ int get_file_size(char* file_name, char* p) {
       strcat(curr_file_name, curr_file_extension);
 
       if (strcmp(file_name, curr_file_name) == 0) {
-        int file_size = (p[28] & 0xFF) + ((p[29] & 0xFF) << 8) + ((p[30] & 0xFF) << 16) + ((p[31] & 0xFF) << 24);
-        printf("before return\n");
+        file_size = (p[28] & 0xFF) + ((p[29] & 0xFF) << 8) + ((p[30] & 0xFF) << 16) + ((p[31] & 0xFF) << 24);
         return file_size;
       }
     }
@@ -117,10 +90,11 @@ int get_FAT_entry(int entry, char* p) {
   return result;
 }
 
+// TODO: check if file exist, if yes, do not copy
 void copy_file(char* p, char* p2, char* file_name) {
   int first_logical_sector = get_first_logical_sector(file_name, p + SECTOR_SIZE * 19);
   int fat_entry = first_logical_sector;
-  int physical_entry = (33 + fat_entry - 2) * SECTOR_SIZE;
+  int physical_entry;
   int file_size = get_file_size(file_name, p + SECTOR_SIZE * 19);
   int remaining_byte = file_size;
 
@@ -163,7 +137,6 @@ int main(int argc, char* argv[]) {
 
   // search file in root directory
   int file_size = get_file_size(argv[2], p + SECTOR_SIZE * 19);
-  // printf("main file_size: %d\n", file_size);
 
   if (file_size <= 0) {
     printf("File not found.\n");
@@ -175,31 +148,9 @@ int main(int argc, char* argv[]) {
       exit(1);
     }
 
-
-
-
-    // TODO:
     // Seek to the last byte and write \0 to "stretch" the file
-    // Seek to the last byte and write \0 to "stretch" the file
-		int result = lseek(file2, file_size-1, SEEK_SET);
-		if (result == -1) {
-			munmap(p, file_stat.st_size);
-			close(file);
-			close(file2);
-			printf("Error: failed to seek to end of file\n");
-			exit(1);
-		}
-		result = write(file2, "", 1);
-		if (result != 1) {
-			munmap(p, file_stat.st_size);
-			close(file);
-			close(file2);
-			printf("Error: failed to write last byte\n");
-			exit(1);
-    }
-
-
-
+    lseek(file2, file_size-1, SEEK_SET);
+    write(file2, "", 1);
 
     char* p2 = mmap(NULL, file_size, PROT_WRITE, MAP_SHARED, file2, 0);
     if (p2 == MAP_FAILED) {
