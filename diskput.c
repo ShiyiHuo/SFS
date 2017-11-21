@@ -32,15 +32,11 @@ int file_exists(char* file_name, char* p) {
       strcat(curr_file_name, curr_file_extension);
 
       if (strcmp(file_name, curr_file_name) == 0) {
-        printf("file_name: %s\n", curr_file_name);
-        printf("file exist label\n");
         return 1;
       }
     }
     p += 32;
   }
-
-  printf("file not exist label\n");
   return -1;
 }
 
@@ -75,11 +71,11 @@ int get_FAT_entry(int entry, char* p) {
   int result;
   if ((entry % 2) == 0) {
     a = p[SECTOR_SIZE + ((3 * entry) / 2) + 1] & 0x0F;  // low 4 bits
-    b = p[SECTOR_SIZE + ((3 * entry) / 2)];
+    b = p[SECTOR_SIZE + ((3 * entry) / 2)] & 0xFF;
     result = (a << 8) + b;
   } else {
     a = p[SECTOR_SIZE + (int)((3 * entry) / 2)] & 0xF0;  // high 4 bits
-    b = p[SECTOR_SIZE + (int)((3 * entry) / 2) + 1];
+    b = p[SECTOR_SIZE + (int)((3 * entry) / 2) + 1] & 0xFF;
     result = (a >> 4) + (b << 4);
   }
   return result;
@@ -186,11 +182,11 @@ void copy_file_to_disk(char* p, char* p2, char* file_name, int file_size) {
     int remaining_byte = file_size;
     int curr_FAT_entry = get_next_unused_FAT_entry(p);
     int physical_entry;
+    int i;
+
     create_root_directory(file_name, file_size, curr_FAT_entry, p);
     while (remaining_byte > 0) {
       physical_entry = SECTOR_SIZE * (31 + curr_FAT_entry);
-
-      int i;
       for (i = 0; i < SECTOR_SIZE; i++) {
         if (remaining_byte == 0) {
           update_FAT_entry(curr_FAT_entry, 0xFFF, p);
@@ -199,7 +195,6 @@ void copy_file_to_disk(char* p, char* p2, char* file_name, int file_size) {
         p[i + physical_entry] = p2[file_size - remaining_byte];
         remaining_byte--;
       }
-      update_FAT_entry(curr_FAT_entry, 0x69, p);
       int next_FAT_entry = get_next_unused_FAT_entry(p);
       update_FAT_entry(curr_FAT_entry, next_FAT_entry, p);
       curr_FAT_entry = next_FAT_entry;
@@ -243,7 +238,6 @@ int main(int argc, char* argv[]) {
   }
   struct stat file_stat2;
   if (fstat(file2, &file_stat2) < 0) {
-    close(file2);
     exit(1);
   }
   int file_size = file_stat2.st_size;
