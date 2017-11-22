@@ -121,7 +121,6 @@ void create_root_directory(char* file_name, int file_size, int first_logical_sec
   // set attribute
   p[11] = 0x20;
 
-  // TODO: SET DATE AND TIME
   // set create date & time
   time_t rawtime;
   struct tm* timeinfo;
@@ -134,8 +133,14 @@ void create_root_directory(char* file_name, int file_size, int first_logical_sec
   int hour = timeinfo->tm_hour;
   int minute = timeinfo->tm_min;
 
-  // TODO: PROBLEM...
+  unsigned short *p_time = (unsigned short *) (p + 14);
+  unsigned short *p_date = (unsigned short *) (p + 16);
+  *p_date = ((year - 1980) << 9) + (month << 5) + day;
+  *p_time = (hour << 11) + (minute << 5);
+
   // set first logical cluster
+  unsigned short *p_first_logical_sector = (unsigned short *) (p + 26);
+  *p_first_logical_sector = first_logical_sector;
 
   // set file size
   p[28] = (file_size & 0x000000FF);
@@ -166,12 +171,11 @@ void copy_file_to_disk(char* p, char* p2, char* file_name, int file_size) {
   if (file_exists(file_name, p + SECTOR_SIZE * 19) == -1) {
     int remaining_byte = file_size;
     int curr_FAT_entry = get_next_unused_FAT_entry(p);
-    int physical_entry;
-    int i;
 
     create_root_directory(file_name, file_size, curr_FAT_entry, p);
     while (remaining_byte > 0) {
-      physical_entry = SECTOR_SIZE * (31 + curr_FAT_entry);
+      int physical_entry = SECTOR_SIZE * (31 + curr_FAT_entry);
+      int i;
       for (i = 0; i < SECTOR_SIZE; i++) {
         if (remaining_byte == 0) {
           update_FAT_entry(curr_FAT_entry, 0xFFF, p);
