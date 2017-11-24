@@ -82,8 +82,6 @@ int get_FAT_entry(int entry, char* p) {
 }
 
 int get_next_unused_FAT_entry(char* p) {
-  p += SECTOR_SIZE;
-
   int entry = 2;
   while (get_FAT_entry(entry,p) != 0x000) {
     entry++;
@@ -151,8 +149,6 @@ void create_root_directory(char* file_name, int file_size, int first_logical_sec
 }
 
 void update_FAT_entry(int entry, int value, char* p) {
-  p += SECTOR_SIZE;
-
   if ((entry % 2) == 0) {
     p[SECTOR_SIZE + ((3 * entry) / 2) + 1] = (value >> 8) & 0x0F;
     p[SECTOR_SIZE + ((3 * entry) / 2)] = value & 0xFF;
@@ -171,17 +167,21 @@ void copy_file_to_disk(char* p, char* p2, char* file_name, int file_size) {
   if (file_exists(file_name, p + SECTOR_SIZE * 19) == -1) {
     int remaining_byte = file_size;
     int curr_FAT_entry = get_next_unused_FAT_entry(p);
-
+    printf("first free FAT entry: %d\n", curr_FAT_entry);
     create_root_directory(file_name, file_size, curr_FAT_entry, p);
     while (remaining_byte > 0) {
-      int physical_entry = SECTOR_SIZE * (31 + curr_FAT_entry);
+      int physical_entry = SECTOR_SIZE * (31 + curr_FAT_entry); // in byte
       int i;
       for (i = 0; i < SECTOR_SIZE; i++) {
         if (remaining_byte == 0) {
           update_FAT_entry(curr_FAT_entry, 0xFFF, p);
+
+          int test_fat_entry = get_next_unused_FAT_entry(p);
+          printf("free FAT entry after inserting file: %d\n", test_fat_entry);
+
           return;
         }
-        p[i + physical_entry] = p2[file_size - remaining_byte];
+        p[i + physical_entry] = p2[i];
         remaining_byte--;
       }
       int next_FAT_entry = get_next_unused_FAT_entry(p);
