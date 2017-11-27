@@ -6,8 +6,17 @@
 #include <unistd.h>
 #include <time.h>
 #include <string.h>
+#include <ctype.h>
 
 #define SECTOR_SIZE 512
+
+void to_upper(char* s) {
+  int i=0;
+  while(s[i]) {
+     s[i] = (toupper(s[i]));
+     i++;
+  }
+}
 
 // returns 1 if file exists and returns -1 if file doesn't exist
 int file_exists(char* file_name, char* p) {
@@ -179,13 +188,13 @@ void update_FAT_entry(int entry, int value, char* p) {
 (3) Go through the FAT entries to find unused sectors in disk and copy the file content to these sectors.
 */
 void copy_file_to_disk(char* p, char* p2, char* file_name, int file_size) {
-
 	int wsize, remaining_byte = file_size, tmp;
   int curr_FAT_entry = get_next_unused_FAT_entry(p);
 	int data_offset = SECTOR_SIZE * 33;
 	char *p_base_disk = p;
 	p += data_offset;
 
+  to_upper(file_name);
 	if (file_exists(file_name, p_base_disk + SECTOR_SIZE * 19) != -1) {
 		printf("File already exists.\n");
 		exit(0);

@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/mman.h>
@@ -6,8 +5,17 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
+#include <ctype.h>
 
 #define SECTOR_SIZE 512
+
+void to_upper(char* s) {
+  int i=0;
+  while(s[i]) {
+     s[i] = (toupper(s[i]));
+     i++;
+  }
+}
 
 // return file size if file exists, otherwise return -1
 int get_file_size(char* file_name, char* p) {
@@ -135,13 +143,16 @@ int main(int argc, char* argv[]) {
   }
 
   // search file in root directory
-  int file_size = get_file_size(argv[2], p + SECTOR_SIZE * 19);
+  char* file_to_get = argv[2];
+  to_upper(file_to_get);
+  //int file_size = get_file_size(argv[2], p + SECTOR_SIZE * 19);
+  int file_size = get_file_size(file_to_get, p + SECTOR_SIZE * 19);
 
   if (file_size <= 0) {
     printf("File not found.\n");
   } else {
     // create destination file
-    int file2 = open(argv[2], O_RDWR | O_CREAT, 0666);
+    int file2 = open(file_to_get, O_RDWR | O_CREAT, 0666);
     if (file2 == -1) {
       printf("Error: failed to open file\n");
       exit(1);
@@ -158,7 +169,7 @@ int main(int argc, char* argv[]) {
       exit(1);
     }
 
-    copy_file(p,p2,argv[2]);  // copy from file to file2
+    copy_file(p,p2,file_to_get);  // copy from file to file2
     munmap(p2, file_size);
     close(file2);
   }
