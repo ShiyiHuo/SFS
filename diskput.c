@@ -71,11 +71,11 @@ int get_FAT_entry(int entry, char* p) {
   int result;
   if ((entry % 2) == 0) {
     a = p[SECTOR_SIZE + ((3 * entry) / 2) + 1] & 0x0F;  // low 4 bits
-    b = p[SECTOR_SIZE + ((3 * entry) / 2)] & 0xFF;
+    b = p[SECTOR_SIZE + ((3 * entry) / 2)];
     result = (a << 8) + b;
   } else {
     a = p[SECTOR_SIZE + (int)((3 * entry) / 2)] & 0xF0;  // high 4 bits
-    b = p[SECTOR_SIZE + (int)((3 * entry) / 2) + 1] & 0xFF;
+    b = p[SECTOR_SIZE + (int)((3 * entry) / 2) + 1];
     result = (a >> 4) + (b << 4);
   }
   return result;
@@ -87,6 +87,15 @@ int get_next_unused_FAT_entry(char* p) {
     entry++;
   }
   return entry;
+}
+
+int get_next_free_sector(char *p, int cur_entry){
+	cur_entry++;
+	while (get_FAT_entry(cur_entry, p) != 0x000) {
+		cur_entry++;
+	}
+
+	return cur_entry;
 }
 
 void create_root_directory(char* file_name, int file_size, int first_logical_sector, char* p) {
@@ -115,9 +124,8 @@ void create_root_directory(char* file_name, int file_size, int first_logical_sec
     p[i+8] = file_name[i+stop+1];
   }
 
-  // TODO: what should it be?
   // set attribute
-  p[11] = 0x20;
+  p[11] = 0x00;
 
   // set create date & time
   time_t rawtime;
@@ -149,13 +157,20 @@ void create_root_directory(char* file_name, int file_size, int first_logical_sec
 }
 
 void update_FAT_entry(int entry, int value, char* p) {
-  if ((entry % 2) == 0) {
-    p[SECTOR_SIZE + ((3 * entry) / 2) + 1] = (value >> 8) & 0x0F;
-    p[SECTOR_SIZE + ((3 * entry) / 2)] = value & 0xFF;
-  } else {
-    p[SECTOR_SIZE + (int)((3 * entry) / 2)] = (value << 4) & 0xF0;
-    p[SECTOR_SIZE + (int)((3 * entry) / 2) + 1] = (value >> 4) & 0xFF;
-  }
+	unsigned char *p_ = (unsigned char *)p;
+	unsigned short value2 = value;
+	int pos;
+
+	if ((entry % 2) == 0) {
+		pos = SECTOR_SIZE + ((3 * entry) / 2);
+		p_[pos + 1] = (p_[pos + 1] & 0xf0) + (value2 >> 8);
+		p_[pos] = value2 & 0x00ff;
+	}
+	else{
+		pos = SECTOR_SIZE + (int)((3 * entry) / 2);
+		p_[pos] = (p_[pos] & 0x0f) + ((value2 & 0x000f) << 4);
+		p_[pos + 1] = value2 >> 4;
+	}
 }
 
 /*
@@ -164,34 +179,32 @@ void update_FAT_entry(int entry, int value, char* p) {
 (3) Go through the FAT entries to find unused sectors in disk and copy the file content to these sectors.
 */
 void copy_file_to_disk(char* p, char* p2, char* file_name, int file_size) {
-  if (file_exists(file_name, p + SECTOR_SIZE * 19) == -1) {
-    int remaining_byte = file_size;
-    int curr_FAT_entry = get_next_unused_FAT_entry(p);
-    printf("first free FAT entry: %d\n", curr_FAT_entry);
-    create_root_directory(file_name, file_size, curr_FAT_entry, p);
-    while (remaining_byte > 0) {
-      int physical_entry = SECTOR_SIZE * (31 + curr_FAT_entry); // in byte
-      int i;
-      for (i = 0; i < SECTOR_SIZE; i++) {
-        if (remaining_byte == 0) {
-          update_FAT_entry(curr_FAT_entry, 0xFFF, p);
 
-          int test_fat_entry = get_next_unused_FAT_entry(p);
-          printf("free FAT entry after inserting file: %d\n", test_fat_entry);
+	int wsize, remaining_byte = file_size, tmp;
+  int curr_FAT_entry = get_next_unused_FAT_entry(p);
+	int data_offset = SECTOR_SIZE * 33;
+	char *p_base_disk = p;
+	p += data_offset;
 
-          return;
-        }
-        p[i + physical_entry] = p2[i];
-        remaining_byte--;
-      }
-      int next_FAT_entry = get_next_unused_FAT_entry(p);
-      update_FAT_entry(curr_FAT_entry, next_FAT_entry, p);
-      curr_FAT_entry = next_FAT_entry;
+	if (file_exists(file_name, p_base_disk + SECTOR_SIZE * 19) != -1) {
+		printf("File already exists.\n");
+		exit(0);
+	}
+	create_root_directory(file_name, file_size, curr_FAT_entry, p_base_disk);
+	while(remaining_byte > 0){
+		wsize = remaining_byte < 512 ? remaining_byte % SECTOR_SIZE : SECTOR_SIZE;
+		remaining_byte -= wsize;
+		memcpy(p + (curr_FAT_entry - 2) * SECTOR_SIZE, p2, wsize);
+		p2 += wsize;
+		tmp = curr_FAT_entry;
+		if(remaining_byte <= 0) {
+      curr_FAT_entry = 0xFFF;
     }
-  } else {
-    printf("File already exists.\n");
-    exit(1);
-  }
+		else {
+      curr_FAT_entry = get_next_free_sector(p_base_disk, curr_FAT_entry);
+    }
+		update_FAT_entry(tmp, curr_FAT_entry, p_base_disk);
+	}
 }
 
 

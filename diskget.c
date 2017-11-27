@@ -44,7 +44,7 @@ int get_file_size(char* file_name, char* p) {
 }
 
 // return first logical sector if it exists, otherwise return -1
-int get_first_logical_sector(char* file_name, char* p) {
+int get_first_logical_sector(char* file_name, unsigned char* p) {
   while (p[0] != 0x00) {
     if ((p[11] & 0x02) == 0 && (p[11] & 0x08) == 0) {
       char* curr_file_name = malloc(sizeof(char)*20);
@@ -90,9 +90,8 @@ int get_FAT_entry(int entry, char* p) {
   return result;
 }
 
-// TODO: check if file exist, if yes, do not copy
 void copy_file(char* p, char* p2, char* file_name) {
-  int first_logical_sector = get_first_logical_sector(file_name, p + SECTOR_SIZE * 19);
+  int first_logical_sector = get_first_logical_sector(file_name, (unsigned char *)p + SECTOR_SIZE * 19);
   int fat_entry = first_logical_sector;
   int physical_entry;
   int file_size = get_file_size(file_name, p + SECTOR_SIZE * 19);
