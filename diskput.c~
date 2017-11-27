@@ -117,7 +117,7 @@ void create_root_directory(char* file_name, int file_size, int first_logical_sec
   // set filename and extension
   int i;
   int stop = -1; // index of .
-  for (i = 0; i < 9; i++) {
+  for (i = 0; i < 8; i++) {
     if (file_name[i] == '.') {
       stop = i;
       break;
